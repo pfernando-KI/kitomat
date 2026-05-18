@@ -41,6 +41,30 @@ Before participant work is merged:
 - keep maintainer merge responsibility explicit
 - use participant codes instead of clear names by default
 
+## Branch protection status
+
+Target rule for `main`:
+
+- pull request required before merge
+- at least one approving human review
+- required status check: `validate`
+- no force pushes
+- no branch deletion
+- conversation resolution required
+
+The machine-readable target config is stored in `.github/branch-protection.main.json`.
+
+Important: If GitHub rejects branch protection for a private repository, keep the repository private and use a manual maintainer gate until either the repository is made public or the organization plan supports branch protection on private repositories.
+
+Manual private-mode gate:
+
+1. contributors work on branches or submit files to the maintainer
+2. no participant pushes directly to `main`
+3. maintainer imports files in batches
+4. validators must pass locally or in GitHub Actions
+5. peer/trust review is documented in the pull request
+6. maintainer merges only reviewed release candidates
+
 ## Suggested roles
 
 - Owner: organization owner
@@ -96,4 +120,3 @@ If contributors cannot push directly:
 7. maintainer decides merge or changes
 
 This path has the same quality standard as direct pull requests.
-
