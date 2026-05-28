@@ -1,19 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Footer, Header, ToastProvider, useToast } from '../components/index.js';
+import { isRouteAllowed } from '../lib/nav.js';
 
+const ROLE_STORAGE_KEY = 'kitomat_role_v1';
 const THEME_STORAGE_KEY = 'kitomat_theme_v1';
 
-const ROUTES = [
-  { id: 'dashboard',     label: 'Dashboard' },
-  { id: 'library',       label: 'Bibliothek' },
-  { id: 'detail',        label: 'Detail' },
-  { id: 'contribution',  label: 'Beitragen' },
-  { id: 'review',        label: 'Review' },
-  { id: 'admin',         label: 'Admin' },
-  { id: 'community',     label: 'Community' },
-  { id: 'my-requests',   label: 'Meine Anfragen' },
-  { id: 'faq',           label: 'FAQ' },
-  { id: 'about',         label: 'Über' },
-];
+const ROUTE_LABELS = {
+  dashboard:    'Dashboard',
+  library:      'Bibliothek',
+  detail:       'Detail',
+  contribution: 'Beitrag vorbereiten',
+  review:       'Review Center',
+  admin:        'Admin-Bereich',
+  community:    'Community',
+  'my-requests': 'Meine Requests',
+  faq:          'FAQ',
+  about:        'Über KItomat',
+};
 
 function parseHash() {
   const hash = window.location.hash.replace(/^#\/?/, '');
@@ -22,74 +25,81 @@ function parseHash() {
   return { route: route || 'dashboard', id: id || null };
 }
 
+// ── Routen-Map mit Sektions-Markern pro AP ─────────────────────
+// Andere APs ergänzen ihre View-Imports + Map-Einträge unter ihrer Sektion.
+function renderRoute({ route, detailId }) {
+  switch (route) {
+    // ── AP4 — Library, Detail, Dashboard ──────────────────────
+    case 'dashboard':
+    case 'library':
+    case 'detail':
+      return <DummyView routeId={route} detailId={detailId} />;
+
+    // ── AP5 — Contribution, Community, MyRequests, FAQ, About ──
+    case 'contribution':
+    case 'community':
+    case 'my-requests':
+    case 'faq':
+    case 'about':
+      return <DummyView routeId={route} detailId={detailId} />;
+
+    // ── AP6 — Review, Admin ────────────────────────────────────
+    case 'review':
+    case 'admin':
+      return <DummyView routeId={route} detailId={detailId} />;
+
+    default:
+      return <DummyView routeId="dashboard" detailId={null} />;
+  }
+}
+
 function DummyView({ routeId, detailId }) {
-  const meta = ROUTES.find((r) => r.id === routeId);
+  const label = ROUTE_LABELS[routeId] || routeId;
+  const { show } = useToast();
   return (
     <main className="page">
       <div className="container" style={{ padding: '32px 0' }}>
-        <div className="h-eyebrow">AP1a Platzhalter</div>
-        <h1 className="h1">{meta ? meta.label : routeId}</h1>
+        <div className="h-eyebrow">AP3a Platzhalter</div>
+        <h1 className="h1">{label}</h1>
         <p className="muted">
-          Diese Ansicht ist ein Vite-Skeleton-Platzhalter. Die echte Implementierung folgt in AP4–AP6.
+          Diese Ansicht ist ein App-Shell-Platzhalter. Die echte Implementierung folgt in AP4–AP6.
           {detailId && <> Detail-ID: <code>{detailId}</code></>}
         </p>
         <div className="card" style={{ marginTop: 22, padding: 22 }}>
           <div className="h3">Route aktiv: <code>#/{routeId}{detailId ? `/${detailId}` : ''}</code></div>
           <p className="muted" style={{ marginTop: 8 }}>
-            Styles aus <code>global.css</code> geladen — CSS-Variablen aktiv, Light/Dark-Mode persistiert.
+            Header + Footer + Theme + Rollenwechsel + Toast laufen live aus den
+            Komponenten in <code>src/components/</code>.
           </p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ marginTop: 12 }}
+            onClick={() => show({ title: 'Toast-Demo', body: 'Toast-Context funktioniert.', tone: 'success' })}
+          >
+            Toast auslösen
+          </button>
         </div>
       </div>
     </main>
   );
 }
 
-function ThemeToggle({ theme, onToggle }) {
-  return (
-    <button
-      type="button"
-      className="btn btn-ghost btn-sm"
-      onClick={onToggle}
-      aria-label="Theme umschalten"
-    >
-      {theme === 'dark' ? 'Light' : 'Dark'}
-    </button>
-  );
-}
-
-function StubHeader({ route, theme, onToggleTheme, onNavigate }) {
-  return (
-    <header style={{ borderBottom: '1px solid var(--line)', background: 'var(--surface)' }}>
-      <div className="container" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '14px 0' }}>
-        <a href="#/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <img src="/src/assets/kitomat-mark.png" alt="KI-tomat" style={{ height: 28 }} />
-          <strong style={{ color: 'var(--ink)' }}>KI-tomat</strong>
-        </a>
-        <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-          {ROUTES.map((r) => (
-            <a
-              key={r.id}
-              href={`#/${r.id}`}
-              className={`nav-link${route === r.id ? ' active' : ''}`}
-              onClick={(e) => { e.preventDefault(); onNavigate(r.id); }}
-            >
-              {r.label}
-            </a>
-          ))}
-        </nav>
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-      </div>
-    </header>
-  );
-}
-
-export default function App() {
+function AppShell() {
   const [{ route, detailId }, setLocation] = useState(() => {
     const parsed = parseHash();
     return { route: parsed.route, detailId: parsed.id };
   });
 
-  const [theme, setTheme] = useState(() => {
+  const [role, setRoleState] = useState(() => {
+    try {
+      const stored = localStorage.getItem(ROLE_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (e) { /* localStorage nicht verfügbar */ }
+    return 'user';
+  });
+
+  const [theme, setThemeState] = useState(() => {
     try {
       const stored = localStorage.getItem(THEME_STORAGE_KEY);
       if (stored === 'light' || stored === 'dark') return stored;
@@ -97,9 +107,18 @@ export default function App() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
+  const setRole = (next) => {
+    setRoleState(next);
+    try { localStorage.setItem(ROLE_STORAGE_KEY, next); } catch (e) { /* ignore */ }
+  };
+
+  const setTheme = (next) => {
+    setThemeState(next);
+    try { localStorage.setItem(THEME_STORAGE_KEY, next); } catch (e) { /* ignore */ }
+  };
+
   useEffect(() => {
     document.body.classList.toggle('dark', theme === 'dark');
-    try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch (e) { /* ignore */ }
   }, [theme]);
 
   useEffect(() => {
@@ -112,26 +131,53 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const navigate = (target, id) => {
+  // Rollen-Guard: bei nicht erlaubter Kombination Route → Dashboard umleiten
+  useEffect(() => {
+    if (!isRouteAllowed(route, role)) {
+      const fallback = '#/dashboard';
+      if (window.location.hash !== fallback) {
+        window.location.hash = fallback;
+      }
+    }
+  }, [route, role]);
+
+  const go = (target, id) => {
     const newHash = id ? `#/${target}/${id}` : `#/${target}`;
     if (window.location.hash !== newHash) {
       window.location.hash = newHash;
     } else {
       setLocation({ route: target, detailId: id || null });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   };
 
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  // Modal-Stubs für AP3b — bis dahin als No-Op-Toasts, damit Header-Aktionen funktionieren.
+  const { show } = useToast();
+  const openChat = () => show({ title: 'Chatbot folgt in AP3b', tone: 'info' });
+  const openLogin = () => show({ title: 'Admin-Login folgt in AP3b', tone: 'info' });
 
   return (
     <>
-      <StubHeader
+      <Header
         route={route}
+        go={go}
+        openChat={openChat}
+        openLogin={openLogin}
+        role={role}
+        setRole={setRole}
         theme={theme}
-        onToggleTheme={toggleTheme}
-        onNavigate={(r) => navigate(r)}
+        setTheme={setTheme}
       />
-      <DummyView routeId={route} detailId={detailId} />
+      {renderRoute({ route, detailId })}
+      <Footer go={go} />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppShell />
+    </ToastProvider>
   );
 }
