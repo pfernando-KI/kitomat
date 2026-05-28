@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Footer, Header, ToastProvider, useToast } from '../components/index.js';
 import { isRouteAllowed } from '../lib/nav.js';
-
-// ── AP4 — View-Imports ────────────────────────────────────────
-import Dashboard from '../views/Dashboard.jsx';
-import Library from '../views/Library.jsx';
-import Detail from '../views/Detail.jsx';
+import About from '../views/About.jsx';
+import Community from '../views/Community.jsx';
+import Contribution from '../views/Contribution.jsx';
+import FAQ from '../views/FAQ.jsx';
+import MyRequests from '../views/MyRequests.jsx';
 
 // ?? AP5 ? View-Imports ????????????????????????????????????????
 import About from '../views/About.jsx';
@@ -39,20 +39,25 @@ function parseHash() {
 
 // ── Routen-Map mit Sektions-Markern pro AP ─────────────────────
 // Andere APs ergänzen ihre View-Imports + Map-Einträge unter ihrer Sektion.
-function renderRoute({ route, detailId, go, role, openChat, openVideo }) {
+function renderRoute({ route, detailId, go }) {
   switch (route) {
     // ── AP4 — Library, Detail, Dashboard ──────────────────────
-    case 'dashboard': return <Dashboard go={go} role={role} openChat={openChat} openVideo={openVideo} />;
-    case 'library':   return <Library go={go} />;
-    case 'detail':    return <Detail id={detailId} go={go} />;
+    case 'dashboard':
+    case 'library':
+    case 'detail':
+      return <DummyView routeId={route} detailId={detailId} />;
 
     // ── AP5 — Contribution, Community, MyRequests, FAQ, About ──
     case 'contribution':
+      return <Contribution go={go} />;
     case 'community':
+      return <Community go={go} />;
     case 'my-requests':
+      return <MyRequests go={go} />;
     case 'faq':
+      return <FAQ />;
     case 'about':
-      return <DummyView routeId={route} detailId={detailId} />;
+      return <About go={go} />;
 
     // ── AP6 — Review, Admin ────────────────────────────────────
     case 'review':
@@ -60,7 +65,7 @@ function renderRoute({ route, detailId, go, role, openChat, openVideo }) {
       return <DummyView routeId={route} detailId={detailId} />;
 
     default:
-      return <Dashboard go={go} role={role} openChat={openChat} openVideo={openVideo} />;
+      return <DummyView routeId="dashboard" detailId={null} />;
   }
 }
 
@@ -162,11 +167,10 @@ function AppShell() {
     }
   };
 
-  // Modal-Stubs für AP3b — bis dahin als No-Op-Toasts, damit Header- und View-Aktionen funktionieren.
+  // Modal-Stubs für AP3b — bis dahin als No-Op-Toasts, damit Header-Aktionen funktionieren.
   const { show } = useToast();
   const openChat = () => show({ title: 'Chatbot folgt in AP3b', tone: 'info' });
   const openLogin = () => show({ title: 'Admin-Login folgt in AP3b', tone: 'info' });
-  const openVideo = () => show({ title: 'Erklärvideo folgt in AP3b', tone: 'info' });
 
   return (
     <>
@@ -180,7 +184,7 @@ function AppShell() {
         theme={theme}
         setTheme={setTheme}
       />
-      {renderRoute({ route, detailId, go, role, openChat, openVideo })}
+      {renderRoute({ route, detailId, go })}
       <Footer go={go} />
     </>
   );
