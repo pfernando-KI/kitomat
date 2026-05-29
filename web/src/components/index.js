@@ -11,10 +11,10 @@ export { RoleSwitcher } from './RoleSwitcher.jsx';
 export { ThemeToggle } from './ThemeToggle.jsx';
 export { ToastProvider, useToast } from './Toast.jsx';
 
-// ── AP3b — Modals (folgt) ──────────────────────────────────────
-// export { ChatbotWidget } from './modals/ChatbotWidget.jsx';
-// export { VideoModal } from './modals/VideoModal.jsx';
-// export { AdminLoginModal } from './modals/AdminLoginModal.jsx';
+// ── AP3b — Modals ──────────────────────────────────────────────
+export { ChatbotWidget } from './modals/ChatbotWidget.jsx';
+export { VideoModal } from './modals/VideoModal.jsx';
+export { AdminLoginModal } from './modals/AdminLoginModal.jsx';
 
 // ── AP4 — Library/Detail-Spezifika ─────────────────────────────
 export { RiskBadge, RISK } from './RiskBadge.jsx';

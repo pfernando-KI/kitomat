@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Footer, Header, ToastProvider, useToast } from '../components/index.js';
+import { AdminLoginModal, ChatbotWidget, Footer, Header, ToastProvider, useToast, VideoModal } from '../components/index.js';
 import { isRouteAllowed } from '../lib/nav.js';
 
 // -- AP4 - View imports -----------------------------------------------------
@@ -112,6 +112,10 @@ function AppShell() {
     return { route: parsed.route, detailId: parsed.id };
   });
 
+  const [chatOpen, setChatOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+
   const [role, setRoleState] = useState(() => {
     try {
       const stored = localStorage.getItem(ROLE_STORAGE_KEY);
@@ -172,9 +176,17 @@ function AppShell() {
   };
 
   const { show } = useToast();
-  const openChat = () => show({ title: 'Chatbot folgt in AP3b', tone: 'info' });
-  const openLogin = () => show({ title: 'Admin-Login folgt in AP3b', tone: 'info' });
-  const openVideo = () => show({ title: 'Erklärvideo folgt in AP3b', tone: 'info' });
+
+  // ── AP3b — Modal-Handler ───────────────────────────────────────
+  const openChat = () => setChatOpen(true);
+  const openVideo = () => setVideoOpen(true);
+  const openLogin = () => setLoginOpen(true);
+
+  const handleAdminLogin = () => {
+    setRole('admin');
+    setLoginOpen(false);
+    show({ title: 'Admin-Modus aktiv', body: 'Demo-Login erfolgreich.', tone: 'success' });
+  };
 
   return (
     <>
@@ -190,6 +202,11 @@ function AppShell() {
       />
       {renderRoute({ route, detailId, go, role, openChat, openVideo })}
       <Footer go={go} />
+
+      {/* ── AP3b — Modal Mount-Points ────────────────────────── */}
+      <ChatbotWidget open={chatOpen} setOpen={setChatOpen} />
+      <VideoModal open={videoOpen} onClose={() => setVideoOpen(false)} />
+      <AdminLoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={handleAdminLogin} />
     </>
   );
 }
