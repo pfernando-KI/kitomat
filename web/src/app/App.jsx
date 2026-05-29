@@ -2,32 +2,36 @@ import { useEffect, useState } from 'react';
 import { Footer, Header, ToastProvider, useToast } from '../components/index.js';
 import { isRouteAllowed } from '../lib/nav.js';
 
-// ── AP4 — View-Imports ────────────────────────────────────────
+// -- AP4 - View imports -----------------------------------------------------
 import Dashboard from '../views/Dashboard.jsx';
 import Library from '../views/Library.jsx';
 import Detail from '../views/Detail.jsx';
 
-// ?? AP5 ? View-Imports ????????????????????????????????????????
+// -- AP5 - View imports -----------------------------------------------------
 import About from '../views/About.jsx';
 import Community from '../views/Community.jsx';
 import Contribution from '../views/Contribution.jsx';
 import FAQ from '../views/FAQ.jsx';
 import MyRequests from '../views/MyRequests.jsx';
 
+// -- AP6 - View imports -----------------------------------------------------
+import Admin from '../views/Admin.jsx';
+import Review from '../views/Review.jsx';
+
 const ROLE_STORAGE_KEY = 'kitomat_role_v1';
 const THEME_STORAGE_KEY = 'kitomat_theme_v1';
 
 const ROUTE_LABELS = {
-  dashboard:    'Dashboard',
-  library:      'Bibliothek',
-  detail:       'Detail',
+  dashboard: 'Dashboard',
+  library: 'Bibliothek',
+  detail: 'Detail',
   contribution: 'Beitrag vorbereiten',
-  review:       'Review Center',
-  admin:        'Admin-Bereich',
-  community:    'Community',
+  review: 'Review Center',
+  admin: 'Admin-Bereich',
+  community: 'Community',
   'my-requests': 'Meine Requests',
-  faq:          'FAQ',
-  about:        'Über KItomat',
+  faq: 'FAQ',
+  about: 'Über KItomat',
 };
 
 function parseHash() {
@@ -37,26 +41,33 @@ function parseHash() {
   return { route: route || 'dashboard', id: id || null };
 }
 
-// ── Routen-Map mit Sektions-Markern pro AP ─────────────────────
-// Andere APs ergänzen ihre View-Imports + Map-Einträge unter ihrer Sektion.
 function renderRoute({ route, detailId, go, role, openChat, openVideo }) {
   switch (route) {
-    // ── AP4 — Library, Detail, Dashboard ──────────────────────
-    case 'dashboard': return <Dashboard go={go} role={role} openChat={openChat} openVideo={openVideo} />;
-    case 'library':   return <Library go={go} />;
-    case 'detail':    return <Detail id={detailId} go={go} />;
+    // -- AP4 - Library, Detail, Dashboard ----------------------------------
+    case 'dashboard':
+      return <Dashboard go={go} role={role} openChat={openChat} openVideo={openVideo} />;
+    case 'library':
+      return <Library go={go} />;
+    case 'detail':
+      return <Detail id={detailId} go={go} />;
 
-    // ── AP5 — Contribution, Community, MyRequests, FAQ, About ──
-    case 'contribution': return <Contribution go={go} />;
-    case 'community':    return <Community go={go} />;
-    case 'my-requests':  return <MyRequests go={go} />;
-    case 'faq':          return <FAQ />;
-    case 'about':        return <About go={go} />;
+    // -- AP5 - Contribution, Community, MyRequests, FAQ, About -------------
+    case 'contribution':
+      return <Contribution go={go} />;
+    case 'community':
+      return <Community go={go} />;
+    case 'my-requests':
+      return <MyRequests go={go} />;
+    case 'faq':
+      return <FAQ />;
+    case 'about':
+      return <About go={go} />;
 
-    // ── AP6 — Review, Admin ────────────────────────────────────
+    // -- AP6 - Review, Admin -----------------------------------------------
     case 'review':
+      return <Review go={go} />;
     case 'admin':
-      return <DummyView routeId={route} detailId={detailId} />;
+      return <Admin go={go} />;
 
     default:
       return <Dashboard go={go} role={role} openChat={openChat} openVideo={openVideo} />;
@@ -72,7 +83,7 @@ function DummyView({ routeId, detailId }) {
         <div className="h-eyebrow">AP3a Platzhalter</div>
         <h1 className="h1">{label}</h1>
         <p className="muted">
-          Diese Ansicht ist ein App-Shell-Platzhalter. Die echte Implementierung folgt in AP4–AP6.
+          Diese Ansicht ist ein App-Shell-Platzhalter. Die echte Implementierung folgt in AP4-AP6.
           {detailId && <> Detail-ID: <code>{detailId}</code></>}
         </p>
         <div className="card" style={{ marginTop: 22, padding: 22 }}>
@@ -141,7 +152,6 @@ function AppShell() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  // Rollen-Guard: bei nicht erlaubter Kombination Route → Dashboard umleiten
   useEffect(() => {
     if (!isRouteAllowed(route, role)) {
       const fallback = '#/dashboard';
@@ -161,7 +171,6 @@ function AppShell() {
     }
   };
 
-  // Modal-Stubs für AP3b — bis dahin als No-Op-Toasts, damit Header- und View-Aktionen funktionieren.
   const { show } = useToast();
   const openChat = () => show({ title: 'Chatbot folgt in AP3b', tone: 'info' });
   const openLogin = () => show({ title: 'Admin-Login folgt in AP3b', tone: 'info' });
