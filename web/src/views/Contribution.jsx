@@ -491,7 +491,7 @@ function TrustCheckStep() {
 function RequestStep({ requestSent, setRequestSent }) {
   const { show } = useToast();
   const isDark = useIsDarkMode();
-  const headerTextColor = isDark ? '#1A1916' : 'white';
+  const headerTextColor = isDark ? 'var(--surface)' : 'white';
   const submit = () => {
     if (requestSent) return;
     setRequestSent(true);
