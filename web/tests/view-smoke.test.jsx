@@ -55,7 +55,7 @@ describe('view smoke tests', () => {
   it('renders community', () => {
     renderView(<Community go={go} />);
 
-    expect(screen.getByRole('heading', { name: /Frag die Community/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Finde Mitwirkende für KI-Projekte/i })).toBeInTheDocument();
   });
 
   it('renders my requests', () => {
@@ -88,5 +88,4 @@ describe('view smoke tests', () => {
     expect(screen.getByRole('heading', { name: /System, Rollen & Integrationen/i })).toBeInTheDocument();
   });
 });
-
 
