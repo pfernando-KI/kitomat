@@ -6,6 +6,12 @@ Frische KI-Ressourcen. Reife Ideen.
 
 KItomat ist ein offenes GitHub-Repository fuer reviewfaehige KI-Arbeitsbausteine. Ziel ist nicht eine moeglichst grosse Prompt-Sammlung, sondern ein vertrauenswuerdiger Bestand aus fachlich strukturierten Paketen, nachvollziehbaren Quellen, synthetischen Beispielen und menschlicher Review-Logik.
 
+## Web UI
+
+Die Weboberfläche (Phase-2-MVP, AP1a–AP7) ist live unter **https://pfernando-KI.github.io/kitomat/web/**.
+
+Sie zeigt Dashboard, Artefakt-Bibliothek, Contribution-Stepper, Review-Kanban, Admin- und Community-Bereiche auf Basis von Mockdaten. Quellcode unter [`web/`](web/), Deployment via GitHub Pages (`.github/workflows/deploy-web.yml`).
+
 ## Artefakte
 
 KItomat startet mit drei Artefakttypen:
