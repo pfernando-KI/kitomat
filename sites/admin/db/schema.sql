@@ -5,8 +5,9 @@ CREATE TABLE IF NOT EXISTS team_notes (
   body TEXT NOT NULL
 );
 
+-- AP11: id als TEXT fuer benannte Eintraege (ap8, ap9, ...)
 CREATE TABLE IF NOT EXISTS checklist_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY,
   label TEXT NOT NULL,
   done INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL
