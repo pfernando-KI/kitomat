@@ -6,8 +6,8 @@ import {
   ProcessStrip,
 } from '../components/index.js';
 import { LibraryCard } from './Library.jsx';
-// TODO(AP1b): auf '../data/library.js' / '../data/review.js' umstellen sobald AP1b gemerged
-import { LIBRARY, REVIEW_PIPELINE } from '../data/library.bridge.js';
+import { REVIEW_PIPELINE, useLibraryData } from '../data/index.js';
+import { CONTENT_REPO_URL } from '../lib/links.js';
 import markUrl from '../assets/kitomat-mark.png';
 
 const PROCESS = [
@@ -55,14 +55,16 @@ function QuickCard({ go, target, color, icon, title, desc }) {
 }
 
 export default function Dashboard({ go, role, openChat, openVideo }) {
+  const { artifacts } = useLibraryData();
   const canReview = ['reviewer', 'maintainer', 'admin'].includes(role);
   const counts = {
-    library: LIBRARY.length,
-    prompt: LIBRARY.filter((x) => x.type === 'prompt').length,
-    dataset: LIBRARY.filter((x) => x.type === 'dataset').length,
-    industry: LIBRARY.filter((x) => x.type === 'industry').length,
+    library: artifacts.length,
+    prompt: artifacts.filter((x) => x.type === 'prompt').length,
+    dataset: artifacts.filter((x) => x.type === 'dataset').length,
+    industry: artifacts.filter((x) => x.type === 'industry').length,
     pipeline: REVIEW_PIPELINE.length,
   };
+  const latest = artifacts.slice(0, 3);
 
   return (
     <main className="page">
@@ -129,7 +131,7 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
               )}
               <span className="muted mono" style={{ fontSize: 11 }}>·</span>
               <a
-                href="https://github.com/pfernando-KI/kitomat"
+                href={CONTENT_REPO_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-ghost btn-sm"
@@ -448,16 +450,25 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
               Alle Artefakte <Icon.arrow size={12} />
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-            {LIBRARY.slice(0, 3).map((a) => (
-              <LibraryCard
-                key={a.id}
-                a={a}
-                onOpen={() => go('detail', a.id)}
-                compact
-              />
-            ))}
-          </div>
+          {latest.length === 0 ? (
+            <div
+              className="card muted"
+              style={{ padding: 22, fontSize: 13.5, textAlign: 'center' }}
+            >
+              Noch keine freigegebenen Artefakte verfügbar.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+              {latest.map((a) => (
+                <LibraryCard
+                  key={a.id}
+                  a={a}
+                  onOpen={() => go('detail', a.id)}
+                  compact
+                />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </main>
