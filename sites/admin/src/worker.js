@@ -1,10 +1,8 @@
 // AP11: Internal Admin Site Worker
 // Workspace-interne Admin-Oberflaeche fuer KI-tomat Team
 //
-// TODO vor Produktivbetrieb: exakten Sites-Workspace-User-Header-Namen aus
-// der aktuellen Sites-Doku oder per Runtime-Test verifizieren und
-// SITES_USER_HEADER anpassen.
-const SITES_USER_HEADER = 'x-openai-workspace-user';
+const SITES_USER_EMAIL_HEADER = 'oai-authenticated-user-email';
+const LEGACY_USER_HEADER = 'x-openai-workspace-user';
 const INPUT_MAX_LEN = 2000;
 
 // Default Release-Checkliste AP8-AP13
@@ -23,7 +21,9 @@ export default {
     const method = request.method;
 
     // Workspace-User-Header pruefen (Sites liefert diesen nach Auth)
-    const workspaceUser = request.headers.get(SITES_USER_HEADER);
+    const workspaceUser =
+      request.headers.get(SITES_USER_EMAIL_HEADER) ||
+      request.headers.get(LEGACY_USER_HEADER);
     const isLocalDev = env.LOCAL_DEV === 'true';
 
     // POST-Endpunkte: ohne Header immer 401 (ausser expliziter lokaler Dev-Bypass)
@@ -58,6 +58,8 @@ export default {
 
 // ---- GET /api/admin/state ----
 async function handleState(env) {
+  await ensureSchema(env);
+
   const contentApiUrl = env.CONTENT_API_URL;
   let apiStatus = 'nicht konfiguriert';
   let inventory = [];
@@ -71,7 +73,7 @@ async function handleState(env) {
       if (resp.ok) {
         const data = await resp.json();
         apiStatus = 'erreichbar';
-        inventory = Array.isArray(data) ? data : (data.items || []);
+        inventory = Array.isArray(data) ? data : (data.artifacts || data.items || []);
       } else {
         apiStatus = `HTTP ${resp.status}`;
         apiError = `Content API antwortete mit ${resp.status}`;
@@ -108,6 +110,8 @@ async function handleState(env) {
 
 // ---- POST /api/admin/notes ----
 async function handleNotesPost(request, env, workspaceUser) {
+  await ensureSchema(env);
+
   let body;
   try {
     body = await request.json();
@@ -138,6 +142,8 @@ async function handleNotesPost(request, env, workspaceUser) {
 
 // ---- POST /api/admin/checklist ----
 async function handleChecklistPost(request, env) {
+  await ensureSchema(env);
+
   let body;
   try {
     body = await request.json();
@@ -163,6 +169,8 @@ async function handleChecklistPost(request, env) {
 async function getOrSeedChecklist(env) {
   if (!env.DB) return [];
 
+  await ensureSchema(env);
+
   const existing = await env.DB.prepare('SELECT * FROM checklist_items').all();
   if (existing.results && existing.results.length > 0) {
     return existing.results;
@@ -178,6 +186,25 @@ async function getOrSeedChecklist(env) {
 
   const seeded = await env.DB.prepare('SELECT * FROM checklist_items').all();
   return seeded.results || [];
+}
+
+async function ensureSchema(env) {
+  if (!env.DB) return;
+
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS team_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      author_key TEXT,
+      body TEXT NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS checklist_items (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    )`),
+  ]);
 }
 
 // ---- HTML-Escape (XSS-Schutz) ----
