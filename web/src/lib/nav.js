@@ -1,3 +1,5 @@
+import { ADMIN_SITE_URL } from './links.js';
+
 export const ROLE_LABELS = {
   user:        'Nutzer:in',
   contributor: 'Contributor',
@@ -36,7 +38,12 @@ export function navForRole(role) {
     { id: 'faq',       label: 'FAQ',       desc: 'Häufige Fragen kompakt' },
   ];
   if (role === 'admin') {
-    secondary.push({ id: 'admin', label: 'Admin-Bereich', desc: 'Rollen, Integrationen, Audit' });
+    secondary.push({
+      id: 'admin',
+      label: 'Admin-Bereich',
+      desc: 'Interne Sites-Adminoberflaeche',
+      externalUrl: ADMIN_SITE_URL,
+    });
   }
   return { primary, secondary };
 }

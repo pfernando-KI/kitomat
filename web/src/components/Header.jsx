@@ -6,7 +6,7 @@ import { ThemeToggle } from './ThemeToggle.jsx';
 import { navForRole } from '../lib/nav.js';
 import kitomatMark from '../assets/kitomat-mark.png';
 
-import { CONTENT_REPO_URL } from '../lib/links.js';
+import { ADMIN_SITE_URL, CONTENT_REPO_URL } from '../lib/links.js';
 export function Header({ route, go, openChat, openLogin, role, setRole, theme, setTheme }) {
   const { primary: PRIMARY, secondary: SECONDARY } = navForRole(role);
 
@@ -82,14 +82,15 @@ export function Header({ route, go, openChat, openLogin, role, setRole, theme, s
           >
             <Icon.github size={15} />
           </a>
-          <button
-            type="button"
+          <a
             className="btn btn-ghost btn-sm tt tt-bottom"
-            data-tt="Admin-Login (Demo)"
-            onClick={openLogin}
+            data-tt="Admin Site"
+            href={ADMIN_SITE_URL}
+            target="_blank"
+            rel="noreferrer"
           >
             <Icon.lock size={14} />
-          </button>
+          </a>
 
           <div ref={moreRef} style={{ position: 'relative' }}>
             <button
@@ -113,24 +114,51 @@ export function Header({ route, go, openChat, openLogin, role, setRole, theme, s
                 borderRadius: 12, padding: 6,
                 boxShadow: '0 18px 40px -14px rgba(26,25,22,.18)',
               }}>
-                {SECONDARY.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => { setMoreOpen(false); go(s.id); }}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                      background: route === s.id ? 'var(--bg-2)' : 'transparent',
-                      border: 'none', transition: 'background .12s',
-                    }}
-                    onMouseEnter={(e) => { if (route !== s.id) e.currentTarget.style.background = 'var(--bg-2)'; }}
-                    onMouseLeave={(e) => { if (route !== s.id) e.currentTarget.style.background = ''; }}
-                  >
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{s.label}</div>
-                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{s.desc}</div>
-                  </button>
-                ))}
+                {SECONDARY.map((s) => {
+                  const commonStyle = {
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                    background: route === s.id ? 'var(--bg-2)' : 'transparent',
+                    border: 'none', transition: 'background .12s',
+                    textDecoration: 'none', color: 'inherit',
+                  };
+                  const content = (
+                    <>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{s.label}</div>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{s.desc}</div>
+                    </>
+                  );
+
+                  if (s.externalUrl) {
+                    return (
+                      <a
+                        key={s.id}
+                        href={s.externalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={commonStyle}
+                        onClick={() => setMoreOpen(false)}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-2)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = route === s.id ? 'var(--bg-2)' : ''; }}
+                      >
+                        {content}
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { setMoreOpen(false); go(s.id); }}
+                      style={commonStyle}
+                      onMouseEnter={(e) => { if (route !== s.id) e.currentTarget.style.background = 'var(--bg-2)'; }}
+                      onMouseLeave={(e) => { if (route !== s.id) e.currentTarget.style.background = ''; }}
+                    >
+                      {content}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
