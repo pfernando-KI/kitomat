@@ -2,7 +2,7 @@ import { Icon } from './Icon.jsx';
 import { RoleSwitcher } from './RoleSwitcher.jsx';
 import { ThemeToggle } from './ThemeToggle.jsx';
 
-import { CONTENT_REPO_URL } from '../lib/links.js';
+import { ADMIN_SITE_URL, CONTENT_REPO_URL } from '../lib/links.js';
 export function MobileNav({
   primary, secondary, route, go, onClose, openChat, openLogin,
   role, setRole, theme, setTheme,
@@ -36,15 +36,29 @@ export function MobileNav({
         <div className="h-eyebrow" style={{ marginBottom: 8 }}>Mehr</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 18 }}>
           {secondary.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => go(n.id)}
-              className={`nav-link ${route === n.id ? 'active' : ''}`}
-              style={{ justifyContent: 'flex-start', padding: '12px 14px', fontSize: 15 }}
-            >
-              {n.label}
-            </button>
+            n.externalUrl ? (
+              <a
+                key={n.id}
+                href={n.externalUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="nav-link"
+                style={{ justifyContent: 'flex-start', padding: '12px 14px', fontSize: 15, textDecoration: 'none' }}
+                onClick={onClose}
+              >
+                {n.label}
+              </a>
+            ) : (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => go(n.id)}
+                className={`nav-link ${route === n.id ? 'active' : ''}`}
+                style={{ justifyContent: 'flex-start', padding: '12px 14px', fontSize: 15 }}
+              >
+                {n.label}
+              </button>
+            )
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -59,9 +73,9 @@ export function MobileNav({
           <a className="btn btn-secondary btn-sm" href={CONTENT_REPO_URL} target="_blank" rel="noreferrer">
             <Icon.github size={14} /> GitHub
           </a>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={openLogin}>
+          <a className="btn btn-secondary btn-sm" href={ADMIN_SITE_URL} target="_blank" rel="noreferrer">
             <Icon.lock size={13} /> Admin
-          </button>
+          </a>
           <button
             type="button"
             className="btn btn-primary btn-sm"
