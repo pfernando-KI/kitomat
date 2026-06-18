@@ -309,7 +309,7 @@ export default function Library({ go }) {
                   width: 7,
                   height: 7,
                   borderRadius: 99,
-                  background: status === 'live' ? 'var(--leaf)' : status === 'stale' ? 'var(--amber)' : 'var(--ink-3)',
+                  background: status === 'live' || status === 'github' ? 'var(--leaf)' : status === 'stale' ? 'var(--amber)' : 'var(--ink-3)',
                 }}
               ></span>
               {DATA_SOURCE_LABEL[status] || DATA_SOURCE_LABEL.fallback}
