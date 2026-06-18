@@ -140,10 +140,10 @@ function folderForArtifactType(artifactType) {
   return FOLDER_FOR_TYPE[type];
 }
 
-function normalizeGithubArtifact(meta) {
+function normalizeGithubArtifact(meta, repoPathOverride) {
   const type = TYPE_MAP[meta.artifact_type];
   const folder = FOLDER_FOR_TYPE[type];
-  const repoPath = folder && meta.id ? `${folder}/${meta.id}` : undefined;
+  const repoPath = repoPathOverride || (folder && meta.id ? `${folder}/${meta.id}` : undefined);
   const context =
     typeof meta.use_case === 'string' && meta.use_case.length > 0
       ? meta.use_case
@@ -211,9 +211,8 @@ async function loadGithubArtifacts() {
     if (!metaRes.ok) continue;
     const meta = parseSimpleYaml(await metaRes.text());
     if (!meta.id || !meta.artifact_type || !meta.title) continue;
-    if (meta.id !== id) continue;
     if (folderForArtifactType(meta.artifact_type) !== folder) continue;
-    artifacts.push(normalizeGithubArtifact(meta));
+    artifacts.push(normalizeGithubArtifact(meta, `${folder}/${id}`));
   }
 
   return artifacts.sort((a, b) => a.title.localeCompare(b.title, 'de'));

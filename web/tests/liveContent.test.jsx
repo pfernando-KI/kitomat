@@ -117,6 +117,44 @@ describe('useLibraryData bridge', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('GitHub-Fallback akzeptiert Ordnernamen, die von metadata.id abweichen', async () => {
+    vi.stubEnv('VITE_KITOMAT_CONTENT_API_URL', '');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(githubTreeResponse([
+        'models/jk-ki-stakeholder-persona-framework/metadata.yml',
+      ]))
+      .mockResolvedValueOnce(githubMetadataResponse({
+        id: 'ki-stakeholder-persona-framework',
+        artifact_type: 'model',
+        title: 'Perspektive wechseln',
+        category: 'consulting',
+        status: 'bronze_candidate',
+        language: 'de',
+        version: '0.1.0',
+        maintainer: 'jk',
+        license: 'CC-BY-4.0',
+        data_risk: 'yellow',
+        ai_act_proximity: 'high_risk_adjacent',
+        sources_status: 'provided',
+        target_users: ['KI-Beraterinnen und -Berater'],
+        use_case: 'Stakeholder-Perspektiven entwickeln.',
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { useLibraryData, artifactGithubUrl } = await loadBridge();
+
+    const { result } = renderHook(() => useLibraryData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.status).toBe('github');
+    expect(result.current.artifacts).toHaveLength(1);
+    expect(result.current.artifacts[0].id).toBe('ki-stakeholder-persona-framework');
+    expect(result.current.artifacts[0].repoPath).toBe('models/jk-ki-stakeholder-persona-framework');
+    expect(artifactGithubUrl(result.current.artifacts[0])).toBe(
+      'https://github.com/ki-tomat/kitomat/tree/main/models/jk-ki-stakeholder-persona-framework',
+    );
+  });
+
   it('mit API-URL und Live-Daten: zeigt Live-Artefakte', async () => {
     vi.stubEnv('VITE_KITOMAT_CONTENT_API_URL', API_URL);
     const fetchMock = vi.fn().mockResolvedValue(liveResponse([apiArtifact]));
