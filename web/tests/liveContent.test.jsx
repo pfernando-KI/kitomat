@@ -41,6 +41,29 @@ function liveResponse(artifacts) {
   };
 }
 
+function githubTreeResponse(paths) {
+  return {
+    ok: true,
+    json: async () => ({
+      tree: paths.map((path) => ({ path })),
+    }),
+  };
+}
+
+function githubMetadataResponse(meta) {
+  return {
+    ok: true,
+    text: async () => Object.entries(meta)
+      .map(([key, value]) => {
+        if (Array.isArray(value)) {
+          return `${key}:\n${value.map((v) => `  - "${v}"`).join('\n')}`;
+        }
+        return `${key}: "${value}"`;
+      })
+      .join('\n'),
+  };
+}
+
 // Bridge frisch importieren, damit der modulinterne memorySnapshot pro Test leer ist.
 async function loadBridge() {
   vi.resetModules();
@@ -58,18 +81,40 @@ afterEach(() => {
 });
 
 describe('useLibraryData bridge', () => {
-  it('ohne API-URL: Mockdaten-Modus ohne Fehler', async () => {
+  it('ohne API-URL: laedt Artefakte direkt aus GitHub', async () => {
     vi.stubEnv('VITE_KITOMAT_CONTENT_API_URL', '');
-    const fetchMock = vi.fn();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(githubTreeResponse([
+        'prompts/github-prompt-001/metadata.yml',
+        'prompts/_template/metadata.yml',
+      ]))
+      .mockResolvedValueOnce(githubMetadataResponse({
+        id: 'github-prompt-001',
+        artifact_type: 'prompt_package',
+        title: 'GitHub Prompt-Paket',
+        category: 'Test',
+        status: 'bronze_candidate',
+        language: 'de',
+        version: '1.0.0',
+        maintainer: '@github',
+        license: 'CC-BY-4.0',
+        data_risk: 'green',
+        ai_act_proximity: 'none',
+        sources_status: 'provided',
+        target_users: ['KMU'],
+        use_case: 'Aus dem oeffentlichen GitHub-Repo geladen.',
+      }));
     vi.stubGlobal('fetch', fetchMock);
     const { useLibraryData } = await loadBridge();
 
     const { result } = renderHook(() => useLibraryData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.status).toBe('fallback');
-    expect(result.current.artifacts).toHaveLength(LIBRARY.length);
-    expect(result.current.loading).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('github');
+    expect(result.current.artifacts).toHaveLength(1);
+    expect(result.current.artifacts[0].id).toBe('github-prompt-001');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('mit API-URL und Live-Daten: zeigt Live-Artefakte', async () => {
