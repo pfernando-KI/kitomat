@@ -4,6 +4,25 @@ import { DATENSCHUTZ_HINWEIS, DATENSCHUTZ_KURZ_DO, DATENSCHUTZ_KURZ_DONT } from 
 import { useIsDarkMode } from '../lib/useIsDarkMode.js';
 
 import { CONTENT_REPO_URL } from '../lib/links.js';
+import {
+  readDraft, writeDraft, clearDraft, fileMetadata, buildHandoffMarkdown, CONTENT_ISSUE_NEW_URL,
+} from '../lib/contributionDraft.js';
+
+// AP12 — Ausgangswerte der Formularfelder (zugleich Agenten-Vorschlaege).
+const INITIAL_FORM = {
+  title: "KI-Onboarding-Prompt für Tischlereibetriebe",
+  contributor: "@lena.h",
+  audience: "KMU-Geschäftsführung, Mitarbeitende ohne KI-Vorerfahrung",
+  context: "Kickoff-Workshop, interne Wissenstransfer-Session",
+  language: "DE",
+  license: "—",
+  scenarioPos: "Geschäftsführer:in eines Handwerksbetriebs versteht in 20 Minuten, wozu KI im Büroalltag sinnvoll eingesetzt werden kann.",
+  scenarioRework: "Mitarbeitende:r mit halbem Vorwissen – Begriffe wie 'Prompt' werden erklärt, einzelne Beispiele müssen ggf. an die Branche angepasst werden.",
+  scenarioNeg: "Bei Programmiererfahrung wirkt der Einstieg zu langsam – hier eher die Deep-Dive-Variante nutzen.",
+  sampleIn: "Stelle mir eine 20-minütige KI-Einstiegsrunde für ein 8-köpfiges Tischlerei-Team zusammen.",
+  sampleOut: "1) Begrüßung & Erwartungsmanagement (3 min)\n2) Was ist ein Sprachmodell – Analogie 'Praktikant mit Bibliothek' (5 min)\n3) Drei Live-Beispiele …",
+};
+
 // Contribution Center (v2) — 7-step process with upload + KI-Agent
 export default function Contribution({ go }) {
   const [active, setActive] = React.useState(0);
@@ -11,6 +30,55 @@ export default function Contribution({ go }) {
   const [files, setFiles] = React.useState([]);
   const [agentRun, setAgentRun] = React.useState(false);
   const [requestSent, setRequestSent] = React.useState(false);
+  const [form, setForm] = React.useState(INITIAL_FORM);
+
+  // AP12 — Opt-in-Persistenz: Entwurf nur auf ausdruecklichen Wunsch speichern.
+  const [optIn, setOptIn] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
+
+  // Aktueller Entwurfszustand (nur Datei-Metadaten, keine Inhalte).
+  const draftState = React.useMemo(() => ({
+    step: active,
+    selectedType,
+    files: fileMetadata(files),
+    form,
+  }), [active, selectedType, files, form]);
+
+  // Beim Laden vorhandenen Entwurf wiederherstellen (gleicher Tab).
+  React.useEffect(() => {
+    const d = readDraft();
+    if (d) {
+      setOptIn(true);
+      if (typeof d.step === "number") setActive(d.step);
+      if (d.selectedType) setSelectedType(d.selectedType);
+      if (Array.isArray(d.files)) setFiles(d.files);
+      if (d.form) setForm({ ...INITIAL_FORM, ...d.form });
+    }
+    setHydrated(true);
+  }, []);
+
+  // Bei Aenderungen speichern, aber nur bei aktivem Opt-in.
+  React.useEffect(() => {
+    if (!hydrated) return;
+    if (optIn) writeDraft(draftState);
+  }, [optIn, draftState, hydrated]);
+
+  const handleOptIn = (next) => {
+    setOptIn(next);
+    if (next) writeDraft(draftState); // sofort speichern
+    else clearDraft();                // sofort loeschen
+  };
+
+  const resetDraft = () => {
+    clearDraft();
+    setOptIn(false);
+    setActive(0);
+    setSelectedType("prompt");
+    setFiles([]);
+    setAgentRun(false);
+    setRequestSent(false);
+    setForm(INITIAL_FORM);
+  };
 
   const STEPS = [
     { t:"Artefakttyp wählen",                  d:"Was möchtest du beitragen?" },
@@ -67,9 +135,25 @@ export default function Contribution({ go }) {
           </div>
           <div className="mono" style={{fontSize:12, color:"var(--ink-3)"}}>
             Status: <strong style={{color: requestSent ? "var(--leaf)" : active >= 4 ? "var(--amber)" : "var(--tomato)"}}>
-              {requestSent ? "Review Request übergeben" : active >= 4 ? "in Prüfung" : "in Vorbereitung"}
+              {requestSent ? "Beitrag vorbereitet" : active >= 4 ? "in Prüfung" : "in Vorbereitung"}
             </strong>
           </div>
+        </div>
+
+        {/* AP12 — Entwurf-Persistenz (Opt-in) + Reset */}
+        <div className="card" style={{padding:"16px 22px", marginBottom:18, display:"flex", justifyContent:"space-between", alignItems:"center", gap:16, flexWrap:"wrap"}}>
+          <label style={{display:"flex", alignItems:"flex-start", gap:12, cursor:"pointer", flex:"1 1 420px"}}>
+            <input type="checkbox" checked={optIn} onChange={(e) => handleOptIn(e.target.checked)} style={{marginTop:3, width:16, height:16, accentColor:"var(--tomato)", flexShrink:0}}/>
+            <span>
+              <span style={{fontWeight:600, fontSize:14}}>Entwurf in diesem Browser-Tab speichern</span>
+              <span className="muted" style={{display:"block", fontSize:12.5, marginTop:3, lineHeight:1.5}}>
+                Optional. Der Entwurf wird nur lokal in diesem Browser-Tab abgelegt (sessionStorage) und übersteht ein Neuladen. Ein neuer Tab oder ein anderer Browser sieht ihn nicht. Hochgeladene Dateien werden nicht gespeichert, nur ihre Namen.
+              </span>
+            </span>
+          </label>
+          <button className="btn btn-ghost btn-sm" onClick={resetDraft} style={{flexShrink:0}}>
+            <Icon.close/> Neuer Beitrag
+          </button>
         </div>
 
         <div style={{display:"grid", gridTemplateColumns:"320px 1fr", gap:18}}>
@@ -103,6 +187,8 @@ export default function Contribution({ go }) {
               files={files} setFiles={setFiles}
               agentRun={agentRun} setAgentRun={setAgentRun}
               requestSent={requestSent} setRequestSent={setRequestSent}
+              form={form} setForm={setForm}
+              handoffMarkdown={buildHandoffMarkdown(draftState)}
             />
 
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:32, paddingTop:20, borderTop:"1px solid var(--line)"}}>
@@ -170,7 +256,7 @@ function PrivacyBlock() {
   );
 }
 
-function StepBody({ step, selectedType, setSelectedType, types, files, setFiles, agentRun, setAgentRun, requestSent, setRequestSent }) {
+function StepBody({ step, selectedType, setSelectedType, types, files, setFiles, agentRun, setAgentRun, requestSent, setRequestSent, form, setForm, handoffMarkdown }) {
   if (step === 0) {
     return (
       <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14}}>
@@ -192,11 +278,11 @@ function StepBody({ step, selectedType, setSelectedType, types, files, setFiles,
   }
   if (step === 1) return <UploadStep files={files} setFiles={setFiles}/>;
   if (step === 2) return <AgentStep files={files} agentRun={agentRun} setAgentRun={setAgentRun}/>;
-  if (step === 3) return <MetaStep/>;
-  if (step === 4) return <ScenariosStep/>;
+  if (step === 3) return <MetaStep form={form} setForm={setForm}/>;
+  if (step === 4) return <ScenariosStep form={form} setForm={setForm}/>;
   if (step === 5) return <TrustCheckStep/>;
   // step 6
-  return <RequestStep requestSent={requestSent} setRequestSent={setRequestSent}/>;
+  return <RequestStep requestSent={requestSent} setRequestSent={setRequestSent} handoffMarkdown={handoffMarkdown}/>;
 }
 
 // ---------- Step 2: Upload ----------
@@ -348,25 +434,28 @@ function AgentCheckRow({ l, status, detail }) {
 }
 
 // ---------- Step 4: Meta ----------
-function MetaStep() {
+const META_FIELDS = [
+  { key:"title",       label:"Titel",                       mono:false, suggested:true  },
+  { key:"contributor", label:"Contributor (GitHub-Handle)", mono:true,  suggested:true  },
+  { key:"audience",    label:"Zielgruppe",                  mono:false, suggested:true  },
+  { key:"context",     label:"Einsatzkontext",              mono:false, suggested:true  },
+  { key:"language",    label:"Sprache",                     mono:true,  suggested:true  },
+  { key:"license",     label:"Lizenz",                      mono:true,  suggested:false },
+];
+
+function MetaStep({ form, setForm }) {
+  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   return (
     <div>
       <SuggestionBanner text="KI-Agent hat 5 von 6 Pflichtfeldern vorausgefüllt. Bitte gegenprüfen und ergänzen."/>
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
-        {[
-          ["Titel", "KI-Onboarding-Prompt für Tischlereibetriebe", false, true],
-          ["Contributor (GitHub-Handle)", "@lena.h", true, true],
-          ["Zielgruppe", "KMU-Geschäftsführung, Mitarbeitende ohne KI-Vorerfahrung", false, true],
-          ["Einsatzkontext", "Kickoff-Workshop, interne Wissenstransfer-Session", false, true],
-          ["Sprache", "DE", true, true],
-          ["Lizenz", "—", true, false],
-        ].map(([l, v, mono, suggested]) => (
-          <label key={l}>
+        {META_FIELDS.map(({ key, label, mono, suggested }) => (
+          <label key={key}>
             <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
-              <span className="h-eyebrow" style={{fontSize:11}}>{l}</span>
+              <span className="h-eyebrow" style={{fontSize:11}}>{label}</span>
               {suggested && <span className="mono" style={{fontSize:10, color:"var(--tomato)", fontWeight:600, letterSpacing:".06em"}}>AGENT-VORSCHLAG</span>}
             </div>
-            <input className={`input ${mono ? "mono" : ""}`} defaultValue={v} placeholder={l}/>
+            <input className={`input ${mono ? "mono" : ""}`} value={form[key] ?? ""} onChange={(e) => update(key, e.target.value)} placeholder={label}/>
           </label>
         ))}
       </div>
@@ -402,35 +491,36 @@ function SuggestionBanner({ text }) {
 }
 
 // ---------- Step 5: Szenarien ----------
-function ScenariosStep() {
+function ScenariosStep({ form, setForm }) {
+  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   return (
     <div>
       <SuggestionBanner text="KI-Agent hat drei Szenarien aus deinen Dateien vorgeschlagen. Bitte prüfen, ergänzen oder verwerfen."/>
       <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12}}>
         <ScenarioEditable color="leaf"   label="Positives Szenario"
-          text="Geschäftsführer:in eines Handwerksbetriebs versteht in 20 Minuten, wozu KI im Büroalltag sinnvoll eingesetzt werden kann."/>
+          value={form.scenarioPos} onChange={(v) => update("scenarioPos", v)}/>
         <ScenarioEditable color="amber"  label="Nachbearbeitbares Szenario"
-          text="Mitarbeitende:r mit halbem Vorwissen – Begriffe wie 'Prompt' werden erklärt, einzelne Beispiele müssen ggf. an die Branche angepasst werden."/>
+          value={form.scenarioRework} onChange={(v) => update("scenarioRework", v)}/>
         <ScenarioEditable color="tomato" label="Negatives Szenario"
-          text="Bei Programmiererfahrung wirkt der Einstieg zu langsam – hier eher die Deep-Dive-Variante nutzen."/>
+          value={form.scenarioNeg} onChange={(v) => update("scenarioNeg", v)}/>
       </div>
       <div style={{marginTop:18, display:"grid", gridTemplateColumns:"1fr 1fr", gap:14}}>
         <label>
           <div className="h-eyebrow" style={{marginBottom:6, fontSize:11}}>Synthetisches Beispiel · Input</div>
           <textarea className="input mono" style={{minHeight:120, resize:"vertical"}}
-            defaultValue={"Stelle mir eine 20-minütige KI-Einstiegsrunde für ein 8-köpfiges Tischlerei-Team zusammen."}/>
+            value={form.sampleIn ?? ""} onChange={(e) => update("sampleIn", e.target.value)}/>
         </label>
         <label>
           <div className="h-eyebrow" style={{marginBottom:6, fontSize:11}}>Erwarteter Beispieloutput</div>
           <textarea className="input mono" style={{minHeight:120, resize:"vertical"}}
-            defaultValue={"1) Begrüßung & Erwartungsmanagement (3 min)\n2) Was ist ein Sprachmodell – Analogie 'Praktikant mit Bibliothek' (5 min)\n3) Drei Live-Beispiele …"}/>
+            value={form.sampleOut ?? ""} onChange={(e) => update("sampleOut", e.target.value)}/>
         </label>
       </div>
     </div>
   );
 }
 
-function ScenarioEditable({ color, label, text }) {
+function ScenarioEditable({ color, label, value, onChange }) {
   const palette = {
     leaf:   { bg:"var(--leaf-soft)",   border:"var(--leaf-border)", ink:"var(--leaf-ink)" },
     amber:  { bg:"var(--amber-soft)",  border:"var(--amber-border)", ink:"var(--amber-ink)" },
@@ -442,7 +532,7 @@ function ScenarioEditable({ color, label, text }) {
         <span style={{fontWeight:700, fontSize:13, color:palette.ink}}>{label}</span>
         <span className="mono" style={{fontSize:10, color:palette.ink, opacity:.7, letterSpacing:".06em"}}>AGENT-VORSCHLAG</span>
       </div>
-      <textarea defaultValue={text} style={{
+      <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} style={{
         background:"transparent", border:"none", outline:"none", resize:"vertical",
         color:palette.ink, fontFamily:"inherit", fontSize:13.5, lineHeight:1.5, minHeight:90, padding:0
       }}/>
@@ -488,7 +578,7 @@ function TrustCheckStep() {
 }
 
 // ---------- Step 7: Review Request ----------
-function RequestStep({ requestSent, setRequestSent }) {
+function RequestStep({ requestSent, setRequestSent, handoffMarkdown }) {
   const { show } = useToast();
   const isDark = useIsDarkMode();
   const headerTextColor = isDark ? 'var(--surface)' : 'white';
@@ -496,26 +586,66 @@ function RequestStep({ requestSent, setRequestSent }) {
     if (requestSent) return;
     setRequestSent(true);
     show({
-      title: "Review Request aufgenommen und abgesendet.",
-      body: "Dein Review Request wurde zur Prüfung übergeben. Reviewer werden im nächsten Schritt benachrichtigt.",
+      title: "Beitrag vorbereitet.",
+      body: "Dein Beitrag ist vorbereitet. Die eigentliche Einreichung machst du in GitHub: Text kopieren und als Issue oder Pull Request einfügen.",
       tone: "success",
     });
   };
 
+  const copyHandoff = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(handoffMarkdown);
+        show({ title: "Issue-Text kopiert.", body: "Füge ihn in GitHub als neues Issue oder in deinen Pull Request ein.", tone: "success" });
+      } else {
+        throw new Error("clipboard unavailable");
+      }
+    } catch {
+      show({ title: "Kopieren nicht möglich.", body: "Bitte markiere den Text im Vorschau-Feld und kopiere ihn manuell.", tone: "error" });
+    }
+  };
+
   return (
     <div>
+      {/* AP12 — GitHub-Handoff: WebUI bereitet vor, GitHub übernimmt die Einreichung */}
+      <div className="card" style={{padding:22, marginBottom:18}}>
+        <div className="h-eyebrow" style={{marginBottom:6}}>GitHub-Handoff</div>
+        <h3 className="h3" style={{marginBottom:8}}>Beitrag an GitHub übergeben</h3>
+        <p className="muted" style={{margin:"0 0 16px", fontSize:13.5, lineHeight:1.55, maxWidth:680}}>
+          Die WebUI bereitet deinen Beitrag nur vor. Die eigentliche Einreichung übernimmt GitHub:
+          kopiere den vorbereiteten Issue-Text, öffne ein neues Issue im Content-Repository und füge ihn dort ein.
+          Es wird nichts automatisch nach GitHub geschrieben.
+        </p>
+        <textarea className="input mono" readOnly value={handoffMarkdown}
+          style={{minHeight:200, resize:"vertical", width:"100%", fontSize:12, lineHeight:1.5}}/>
+        <div style={{display:"flex", gap:8, flexWrap:"wrap", marginTop:14}}>
+          <button className="btn btn-primary btn-sm" onClick={copyHandoff}>
+            <Icon.file size={13}/> Issue-Text kopieren
+          </button>
+          <a className="btn btn-secondary btn-sm" href={CONTENT_ISSUE_NEW_URL} target="_blank" rel="noreferrer">
+            <Icon.github size={13}/> GitHub Issue öffnen <Icon.external/>
+          </a>
+          <a className="btn btn-ghost btn-sm" href={CONTENT_REPO_URL} target="_blank" rel="noreferrer">
+            <Icon.github size={13}/> Repository öffnen <Icon.external/>
+          </a>
+        </div>
+        <div className="mono" style={{marginTop:12, fontSize:11, color:"var(--ink-3)"}}>
+          Dateien müssen in GitHub erneut ausgewählt werden – sie werden von der WebUI nicht hochgeladen.
+        </div>
+      </div>
+
       <div className="card" style={{padding:22, background: requestSent ? "var(--leaf-soft)" : "var(--tomato-tint)", border:`1px solid ${requestSent ? "var(--leaf-border)" : "var(--tomato-soft)"}`, marginBottom:18, display:"flex", alignItems:"center", gap:14, transition:"background .2s, border-color .2s"}}>
         <span style={{width:34, height:34, borderRadius:99, background: requestSent ? "var(--leaf)" : "var(--tomato)", color:"white", display:"inline-flex", alignItems:"center", justifyContent:"center", transition:"background .2s"}}>
           <Icon.check size={15}/>
         </span>
         <div style={{flex:1}}>
           <strong style={{color: requestSent ? "var(--leaf-ink)" : "var(--tomato-deep)", fontSize:15}}>
-            {requestSent ? "Request übergeben" : "Bereit für Review"}
+            {requestSent ? "Beitrag vorbereitet" : "Bereit zur Übergabe"}
           </strong>
           <div style={{color: "var(--ink)", fontSize:13, marginTop:2}}>
             {requestSent
-              ? "Dein Review Request liegt jetzt im Review Center. Reviewer werden benachrichtigt."
-              : "Alle Schritte abgeschlossen. Du kannst den Review Request jetzt vorbereiten und an GitHub übergeben."}
+              ? "Dein Beitrag ist vorbereitet. Kopiere oben den Issue-Text und reiche ihn über GitHub ein – die WebUI schreibt nichts automatisch."
+              : "Alle Schritte abgeschlossen. Übergib den Beitrag über den GitHub-Handoff oben an das Repository."}
           </div>
         </div>
       </div>
@@ -555,13 +685,13 @@ Sprache: DE · Lizenz: CC BY 4.0
             </div>
           </div>
           <div style={{display:"flex", flexDirection:"column", gap:14}}>
-            <div className="h-eyebrow" style={{fontSize:11}}>Was beim Übergeben passiert</div>
+            <div className="h-eyebrow" style={{fontSize:11}}>So reichst du in GitHub ein</div>
             <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
               {[
-                "Pull Request wird im Repository angelegt",
-                "Artefakt erscheint im Review Center",
-                "Reviewer-Gruppe erhält eine Benachrichtigung",
-                "Du bekommst eine kurze Bestätigungsmeldung eingeblendet",
+                "Issue-Text oben kopieren",
+                "Neues GitHub-Issue im Content-Repository öffnen",
+                "Text einfügen und Dateien dort erneut auswählen",
+                "Reviewer prüfen den Beitrag in GitHub",
               ].map((s, i) => (
                 <li key={i} style={{display:"flex", gap:9, fontSize:13.5, color:"var(--ink-2)"}}>
                   <span style={{width:18, height:18, borderRadius:5, background: requestSent ? "var(--leaf-soft)" : "var(--bg-2)", color: requestSent ? "var(--leaf)" : "var(--ink-3)", display:"inline-flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1}}>
@@ -572,18 +702,18 @@ Sprache: DE · Lizenz: CC BY 4.0
               ))}
             </ul>
             <div className="mono" style={{fontSize:11, color:"var(--ink-3)", padding:"10px 12px", background:"var(--bg-2)", borderRadius:8, lineHeight:1.5}}>
-              Reviewer-Mail · Discord · LinkedIn werden im Post-MVP automatisch ausgelöst. Im MVP wird die Benachrichtigung simuliert.
+              Diese Vorschau zeigt nur, wie der Beitrag in GitHub aussehen kann. Die WebUI legt kein Issue und keinen Pull Request automatisch an.
             </div>
           </div>
         </div>
         <div style={{padding:"14px 20px", borderTop:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, flexWrap:"wrap"}}>
-          <span className="muted" style={{fontSize:12}}>Im MVP simuliert – der Beitrag wird im Repository angelegt.</span>
+          <span className="muted" style={{fontSize:12}}>Vorschau – die eigentliche Einreichung passiert in GitHub über den Handoff oben.</span>
           <div style={{display:"flex", gap:8}}>
             <a className="btn btn-secondary btn-sm" href={CONTENT_REPO_URL} target="_blank" rel="noreferrer">
               <Icon.github size={13}/> Repository
             </a>
             <button className="btn btn-primary btn-sm" onClick={submit} disabled={requestSent}>
-              {requestSent ? <><Icon.check size={12}/> Request gesendet</> : "Review Request übergeben"}
+              {requestSent ? <><Icon.check size={12}/> Als vorbereitet markiert</> : "Beitrag als vorbereitet markieren"}
             </button>
           </div>
         </div>
