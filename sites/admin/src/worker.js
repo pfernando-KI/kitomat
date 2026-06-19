@@ -82,6 +82,9 @@ export default {
     if (url.pathname === '/api/admin/users/revoke' && method === 'POST') {
       return handleRoleRevoke(request, env, currentUser);
     }
+    if (url.pathname === '/api/admin/users/delete' && method === 'POST') {
+      return handleUserDelete(request, env, currentUser);
+    }
     if (url.pathname === '/api/admin/artifact-status' && method === 'POST') {
       return handleArtifactStatusPost(request, env, currentUser);
     }
@@ -512,6 +515,51 @@ async function handleRoleRevoke(request, env, currentUser) {
   return jsonResp({ ok: true });
 }
 
+async function handleUserDelete(request, env, currentUser) {
+  const body = await readJson(request);
+  if (body.error) return body.error;
+
+  const email = normalizeEmail(body.email);
+  if (!email || !email.includes('@')) return jsonResp({ error: 'Gueltige E-Mail erforderlich.' }, 400);
+  if (email === normalizeEmail(currentUser.email)) {
+    return jsonResp({ error: 'Du kannst deinen eigenen Admin-Zugang nicht loeschen.' }, 409);
+  }
+
+  const explicitAdmins = parseEmailList(env.ADMIN_EMAILS);
+  if (explicitAdmins.includes(email)) {
+    return jsonResp({
+      error: 'Diese Person ist als fester Admin in ADMIN_EMAILS hinterlegt und wuerde automatisch wieder angelegt.',
+    }, 409);
+  }
+
+  const targetRoles = await getRolesForEmail(env, email);
+  if (targetRoles.includes('admin')) {
+    const adminCount = await countAdminRoles(env);
+    if (adminCount <= 1) {
+      return jsonResp({ error: 'Die letzte Admin-Person kann nicht geloescht werden.' }, 409);
+    }
+  }
+
+  await writeAudit(env, {
+    actor: currentUser.email,
+    action: 'delete_user',
+    targetType: 'admin_user',
+    targetId: email,
+    details: targetRoles.join(','),
+  });
+
+  await env.DB
+    .prepare('DELETE FROM admin_user_roles WHERE email = ?')
+    .bind(email)
+    .run();
+  await env.DB
+    .prepare('DELETE FROM admin_users WHERE email = ?')
+    .bind(email)
+    .run();
+
+  return jsonResp({ ok: true });
+}
+
 async function handleArtifactStatusPost(request, env, currentUser) {
   const body = await readJson(request);
   if (body.error) return body.error;
@@ -730,7 +778,7 @@ async function renderAdminPage(env, currentUser) {
   const apiWarningHint = state.apiWarning
     ? `<div class="hint info"><strong>Datenquelle:</strong> ${esc(state.apiWarning)}</div>`
     : '';
-  const externalHint = `<div class="hint info"><strong>Hinweis zu externen Personen:</strong> Rollen in D1 reichen fuer den Admin-Zugang nicht allein. Die Person muss zusaetzlich ueber Sites/Workspace-Zugriff auf diese Admin-Site zugelassen sein.</div>`;
+  const externalHint = `<div class="hint info"><strong>Hinweis zu externen Personen:</strong> Rollen in D1 reichen fuer den Admin-Zugang nicht allein. Die Person muss zusaetzlich ueber Sites/Workspace-Zugriff auf diese Admin-Site zugelassen sein. Beim Anlegen wird keine E-Mail versendet und kein KI-Tomat-Passwort erzeugt; der Login laeuft ueber Sites/Workspace.</div>`;
 
   const inventoryRows = state.inventory.length > 0
     ? state.inventory.map((item) => {
@@ -771,9 +819,10 @@ async function renderAdminPage(env, currentUser) {
             </td>
             <td>${chips}</td>
             <td>${esc(user.status)}</td>
+            <td><button class="danger-lite" onclick="deleteUser('${esc(user.email)}')">Loeschen</button></td>
           </tr>`;
       }).join('')
-    : `<tr><td colspan="3" class="empty">Noch keine Nutzer erfasst.</td></tr>`;
+    : `<tr><td colspan="4" class="empty">Noch keine Nutzer erfasst.</td></tr>`;
 
   const notesHtml = state.notes.length > 0
     ? state.notes.map((n) => `
@@ -836,6 +885,7 @@ async function renderAdminPage(env, currentUser) {
     .role-form input { flex: 1; }
     button { padding: 9px 16px; border-radius: 7px; border: none; background: var(--red); color: #fff; font-weight: 700; cursor: pointer; font-size: 14px; }
     .role-chip { padding: 5px 8px; margin: 0 4px 4px 0; background: #efe9dd; color: #332d25; font-size: 12px; border: 1px solid #d8cfbf; }
+    .danger-lite { padding: 6px 9px; background: #fff; color: #9e211a; border: 1px solid #e0b5ad; font-size: 12px; }
     .check-item { display: block; margin-bottom: 9px; font-size: 14px; cursor: pointer; }
     .check-item input { margin-right: 8px; }
     a { color: #8b1d17; font-weight: 700; }
@@ -859,7 +909,7 @@ async function renderAdminPage(env, currentUser) {
   <div class="section-split">
     <div>
       <table>
-        <thead><tr><th>Nutzer</th><th>Rollen</th><th>Status</th></tr></thead>
+        <thead><tr><th>Nutzer</th><th>Rollen</th><th>Status</th><th>Aktion</th></tr></thead>
         <tbody>${userRows}</tbody>
       </table>
     </div>
@@ -870,7 +920,7 @@ async function renderAdminPage(env, currentUser) {
         <select id="role-id">${roleOptions()}</select>
         <button onclick="grantRole()">Hinzufuegen</button>
       </div>
-      <p class="topline" style="margin-top:12px">Nur Personen mit Rolle <strong>admin</strong> duerfen diese Admin-Seite nutzen. Andere Rollen sind fuer Review- und Contributor-Workflows vorbereitet.</p>
+      <p class="topline" style="margin-top:12px">Nur Personen mit Rolle <strong>admin</strong> duerfen diese Admin-Seite nutzen. Das Anlegen versendet keine E-Mail und setzt kein Passwort; die Person muss sich mit ihrem Sites/Workspace-Konto anmelden.</p>
     </div>
   </div>
 
@@ -927,6 +977,10 @@ async function renderAdminPage(env, currentUser) {
   async function revokeRole(email, role) {
     if (!confirm('Rolle ' + role + ' fuer ' + email + ' entfernen?')) return;
     if (await postJson('/api/admin/users/revoke', { email, role })) location.reload();
+  }
+  async function deleteUser(email) {
+    if (!confirm('Nutzer ' + email + ' komplett aus der Admin-Liste loeschen?')) return;
+    if (await postJson('/api/admin/users/delete', { email })) location.reload();
   }
   async function setArtifactStatus(select) {
     const artifactId = select.dataset.artifactId;
