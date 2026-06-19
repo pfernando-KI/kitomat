@@ -7,6 +7,11 @@ const SITES_USER_NAME_HEADER = 'oai-authenticated-user-full-name';
 const SITES_USER_NAME_ENCODING_HEADER = 'oai-authenticated-user-full-name-encoding';
 const LEGACY_USER_HEADER = 'x-openai-workspace-user';
 const INPUT_MAX_LEN = 2000;
+const CONTENT_REPO_OWNER = 'ki-tomat';
+const CONTENT_REPO_NAME = 'kitomat';
+const CONTENT_REPO_BRANCH = 'main';
+const CONTENT_REPO = `${CONTENT_REPO_OWNER}/${CONTENT_REPO_NAME}`;
+const CONTENT_FOLDERS = new Set(['prompts', 'datasets', 'models']);
 
 const ROLES = [
   { id: 'admin', label: 'Admin', desc: 'Vollzugriff, Rollenvergabe, Statuspflege.' },
@@ -246,6 +251,7 @@ async function handleState(env, currentUser) {
   let apiStatus = 'nicht konfiguriert';
   let inventory = [];
   let apiError = null;
+  let apiWarning = null;
 
   if (contentApiUrl) {
     try {
@@ -263,6 +269,23 @@ async function handleState(env, currentUser) {
     } catch (e) {
       apiStatus = 'nicht erreichbar';
       apiError = e.message;
+    }
+  }
+
+  if (inventory.length === 0) {
+    const fallback = await loadGitHubInventory(env);
+    if (fallback.ok) {
+      apiWarning = apiError
+        ? `${apiError}; GitHub-Fallback aktiv`
+        : 'GitHub-Fallback aktiv';
+      apiError = null;
+      apiStatus = 'GitHub-Fallback';
+      inventory = fallback.inventory;
+    } else if (apiError) {
+      apiError = `${apiError}; GitHub-Fallback fehlgeschlagen: ${fallback.error}`;
+    } else {
+      apiStatus = 'Fehler';
+      apiError = `GitHub-Fallback fehlgeschlagen: ${fallback.error}`;
     }
   }
 
@@ -295,6 +318,7 @@ async function handleState(env, currentUser) {
     contentApiConfigured: Boolean(contentApiUrl),
     apiStatus,
     apiError,
+    apiWarning,
     artifactCount: inventory.length,
     inventory,
     notes,
@@ -303,6 +327,90 @@ async function handleState(env, currentUser) {
     audit,
     generatedAt: new Date().toISOString(),
   });
+}
+
+async function loadGitHubInventory(env) {
+  try {
+    const headers = githubHeaders(env);
+    const treeUrl = `https://api.github.com/repos/${CONTENT_REPO}/git/trees/${CONTENT_REPO_BRANCH}?recursive=1`;
+    const treeResp = await fetch(treeUrl, { headers });
+    if (!treeResp.ok) {
+      return { ok: false, error: `GitHub Tree API HTTP ${treeResp.status}` };
+    }
+
+    const treeData = await treeResp.json();
+    const paths = (treeData.tree || [])
+      .filter((item) => item.type === 'blob')
+      .map((item) => item.path)
+      .filter(isArtifactMetadataPath);
+
+    const inventory = [];
+    for (const path of paths) {
+      const rawUrl = `https://raw.githubusercontent.com/${CONTENT_REPO}/${CONTENT_REPO_BRANCH}/${path}`;
+      const rawResp = await fetch(rawUrl, { headers });
+      if (!rawResp.ok) continue;
+
+      const yaml = await rawResp.text();
+      const parsed = parseSimpleYaml(yaml);
+      const parts = path.split('/');
+      const folder = parts[0];
+      const id = parsed.id || parts[1] || path;
+      const title = parsed.title || parsed.name || id;
+      const artifactType = parsed.artifact_type || parsed.type || folder;
+      const repoPath = parts.slice(0, -1).join('/');
+
+      inventory.push({
+        id,
+        title,
+        type: artifactType,
+        artifact_type: artifactType,
+        status: parsed.status || parsed.lifecycle_status || 'draft',
+        risk: parsed.data_risk || parsed.risk || parsed.risk_level || '-',
+        data_risk: parsed.data_risk || parsed.risk || parsed.risk_level || '-',
+        githubUrl: `https://github.com/${CONTENT_REPO}/tree/${CONTENT_REPO_BRANCH}/${repoPath}`,
+        repoPath,
+        description: parsed.description || parsed.summary || '',
+      });
+    }
+
+    return { ok: true, inventory };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function githubHeaders(env) {
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'kitomat-admin-site',
+  };
+  if (env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
+function isArtifactMetadataPath(path) {
+  const parts = String(path || '').split('/');
+  if (parts.length < 3) return false;
+  if (!CONTENT_FOLDERS.has(parts[0])) return false;
+  if (parts.includes('_template')) return false;
+  return parts[parts.length - 1] === 'metadata.yml' || parts[parts.length - 1] === 'metadata.yaml';
+}
+
+function parseSimpleYaml(text) {
+  const result = {};
+  const lines = String(text || '').split(/\r?\n/);
+  for (const line of lines) {
+    const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2].trim();
+    if (!value || value === '|' || value === '>') continue;
+    value = value.replace(/^['"]|['"]$/g, '');
+    result[key] = value;
+  }
+  return result;
 }
 
 async function handleNotesPost(request, env, currentUser) {
@@ -619,6 +727,9 @@ async function renderAdminPage(env, currentUser) {
   const apiErrorHint = state.apiError
     ? `<div class="hint warn"><strong>Content API:</strong> ${esc(state.apiError)}</div>`
     : '';
+  const apiWarningHint = state.apiWarning
+    ? `<div class="hint info"><strong>Datenquelle:</strong> ${esc(state.apiWarning)}</div>`
+    : '';
   const externalHint = `<div class="hint info"><strong>Hinweis zu externen Personen:</strong> Rollen in D1 reichen fuer den Admin-Zugang nicht allein. Die Person muss zusaetzlich ueber Sites/Workspace-Zugriff auf diese Admin-Site zugelassen sein.</div>`;
 
   const inventoryRows = state.inventory.length > 0
@@ -736,7 +847,7 @@ async function renderAdminPage(env, currentUser) {
 <main>
   <h1>KI-tomat Admin</h1>
   <p class="topline">Angemeldet als <strong>${esc(currentUser.email)}</strong> · Rollen: ${esc(currentUser.roles.join(', '))}</p>
-  ${configHint}${apiErrorHint}${externalHint}
+  ${configHint}${apiErrorHint}${apiWarningHint}${externalHint}
 
   <section class="grid">
     <div class="card"><div class="card-label">Content API</div><div class="card-value" style="font-size:15px">${esc(state.apiStatus)}</div></div>
