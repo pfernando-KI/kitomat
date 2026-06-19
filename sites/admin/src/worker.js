@@ -73,6 +73,9 @@ export default {
     if (url.pathname === '/api/admin/notes' && method === 'POST') {
       return handleNotesPost(request, env, currentUser);
     }
+    if (url.pathname === '/api/admin/notes/delete' && method === 'POST') {
+      return handleNotesDelete(request, env, currentUser);
+    }
     if (url.pathname === '/api/admin/checklist' && method === 'POST') {
       return handleChecklistPost(request, env, currentUser);
     }
@@ -441,6 +444,37 @@ async function handleNotesPost(request, env, currentUser) {
   });
 
   return jsonResp({ ok: true });
+}
+
+async function handleNotesDelete(request, env, currentUser) {
+  const body = await readJson(request);
+  if (body.error) return body.error;
+
+  const ids = Array.isArray(body.ids)
+    ? body.ids.map((id) => Number.parseInt(id, 10)).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+
+  if (ids.length === 0) return jsonResp({ error: 'Keine Notiz ausgewaehlt.' }, 400);
+  if (ids.length > 50) return jsonResp({ error: 'Zu viele Notizen auf einmal ausgewaehlt.' }, 400);
+  if (!env.DB) return jsonResp({ error: 'D1 nicht konfiguriert.' }, 500);
+
+  const uniqueIds = Array.from(new Set(ids));
+  for (const id of uniqueIds) {
+    await env.DB
+      .prepare('DELETE FROM team_notes WHERE id = ?')
+      .bind(id)
+      .run();
+  }
+
+  await writeAudit(env, {
+    actor: currentUser.email,
+    action: 'delete_notes',
+    targetType: 'team_note',
+    targetId: uniqueIds.join(','),
+    details: `${uniqueIds.length} note(s)`,
+  });
+
+  return jsonResp({ ok: true, deleted: uniqueIds.length });
 }
 
 async function handleChecklistPost(request, env, currentUser) {
@@ -827,8 +861,14 @@ async function renderAdminPage(env, currentUser) {
   const notesHtml = state.notes.length > 0
     ? state.notes.map((n) => `
         <div class="note">
-          <span class="note-meta">${esc((n.created_at || '').substring(0, 16).replace('T', ' '))}${n.author_key ? ' · ' + esc(n.author_key) : ''}</span>
-          <p>${esc(n.body)}</p>
+          <label class="note-select">
+            <input type="checkbox" class="note-checkbox" value="${esc(n.id)}">
+            <span>
+              <span class="note-meta">${esc((n.created_at || '').substring(0, 16).replace('T', ' '))}${n.author_key ? ' · ' + esc(n.author_key) : ''}</span>
+              <p>${esc(n.body)}</p>
+            </span>
+          </label>
+          <button class="danger-lite note-delete" onclick="deleteNotes([${Number(n.id)}])">Loeschen</button>
         </div>`).join('')
     : '<p class="empty">Noch keine Notizen.</p>';
 
@@ -877,6 +917,9 @@ async function renderAdminPage(env, currentUser) {
     small { display: block; color: #756d61; margin-top: 3px; font-size: 12px; }
     .empty { opacity: .52; font-style: italic; }
     .note { margin-bottom: 10px; padding: 11px 14px; border-radius: 7px; background: #fff; border: 1px solid var(--line); }
+    .note { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
+    .note-select { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; cursor: pointer; }
+    .note-select input { margin-top: 3px; }
     .note-meta { font-size: 12px; opacity: .55; }
     .note p { margin: 5px 0 0; font-size: 14px; line-height: 1.5; }
     .note-form, .role-form { display: flex; gap: 8px; margin-top: 12px; }
@@ -932,6 +975,7 @@ async function renderAdminPage(env, currentUser) {
 
   <h2>Team-Notizen</h2>
   ${notesHtml}
+  ${state.notes.length > 0 ? '<button class="danger-lite" onclick="deleteSelectedNotes()">Ausgewaehlte Notizen loeschen</button>' : ''}
   <div class="note-form">
     <textarea id="note-text" rows="2" maxlength="2000" placeholder="Neue Notiz ..."></textarea>
     <button onclick="submitNote()">Speichern</button>
@@ -967,6 +1011,22 @@ async function renderAdminPage(env, currentUser) {
     const text = ta.value.trim();
     if (!text) return;
     if (await postJson('/api/admin/notes', { text })) location.reload();
+  }
+  async function deleteNotes(ids) {
+    if (!ids || ids.length === 0) return;
+    const label = ids.length === 1 ? 'diese Notiz' : ids.length + ' Notizen';
+    if (!confirm('Soll ' + label + ' geloescht werden?')) return;
+    if (await postJson('/api/admin/notes/delete', { ids })) location.reload();
+  }
+  async function deleteSelectedNotes() {
+    const ids = Array.from(document.querySelectorAll('.note-checkbox:checked'))
+      .map(function(cb) { return Number.parseInt(cb.value, 10); })
+      .filter(function(id) { return Number.isInteger(id) && id > 0; });
+    if (ids.length === 0) {
+      alert('Bitte zuerst eine oder mehrere Notizen auswaehlen.');
+      return;
+    }
+    await deleteNotes(ids);
   }
   async function grantRole() {
     const email = document.getElementById('role-email').value.trim();
