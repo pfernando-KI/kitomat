@@ -10,6 +10,8 @@ import { REVIEW_PIPELINE, useLibraryData } from '../data/index.js';
 import { CONTENT_REPO_URL } from '../lib/links.js';
 import markUrl from '../assets/kitomat-mark.png';
 
+const explainerVideoUrl = new URL('../../KITomatExplainerVideo.mp4', import.meta.url).href;
+
 const PROCESS = [
   { n: '01', t: 'Artefakt vorbereiten',     d: 'Typ wählen, Idee strukturieren.',                  tone: 'human' },
   { n: '02', t: 'Dateien hochladen',        d: 'MD, YAML, JSON, PDF, DOCX, TXT.',                  tone: 'human' },
@@ -54,7 +56,7 @@ function QuickCard({ go, target, color, icon, title, desc }) {
   );
 }
 
-export default function Dashboard({ go, role, openChat, openVideo }) {
+export default function Dashboard({ go, role, openChat }) {
   const { artifacts } = useLibraryData();
   const canReview = ['reviewer', 'maintainer', 'admin'].includes(role);
   const counts = {
@@ -142,7 +144,14 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
             </div>
           </div>
 
-          <div className="video-card" onClick={openVideo}>
+          <div className="video-card video-card-live">
+            <video
+              className="video-player"
+              src={explainerVideoUrl}
+              controls
+              preload="metadata"
+              aria-label="KItomat Erklärvideo"
+            />
             <div className="video-corner">
               <img
                 src={markUrl}
@@ -157,36 +166,7 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
               KItomat · Tutorial
             </div>
             <div className="video-corner video-corner-r">
-              <Icon.spark size={10} /> Erklärvideo folgt
-            </div>
-            <div className="video-play">
-              <Icon.play />
-            </div>
-            <div className="video-overlay">
-              <div
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  opacity: 0.85,
-                  letterSpacing: '.06em',
-                  marginBottom: 6,
-                }}
-              >
-                02:00 · DEMO-VIDEO GEPLANT
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  letterSpacing: '-.015em',
-                  marginBottom: 4,
-                }}
-              >
-                So funktioniert KItomat
-              </div>
-              <div style={{ fontSize: 14, opacity: 0.88 }}>
-                In 2 Minuten: Artefakte finden, vorbereiten und reviewen.
-              </div>
+              <Icon.play size={10} /> Erklärvideo
             </div>
           </div>
         </section>
