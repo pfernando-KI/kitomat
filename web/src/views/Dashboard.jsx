@@ -6,9 +6,11 @@ import {
   ProcessStrip,
 } from '../components/index.js';
 import { LibraryCard } from './Library.jsx';
-// TODO(AP1b): auf '../data/library.js' / '../data/review.js' umstellen sobald AP1b gemerged
-import { LIBRARY, REVIEW_PIPELINE } from '../data/library.bridge.js';
+import { REVIEW_PIPELINE } from '../data/library.bridge.js';
+import { useLibraryData } from '../data/liveContent.js';
 import markUrl from '../assets/kitomat-mark.png';
+
+const explainerVideoUrl = new URL('../../KITomatExplainerVideo.mp4', import.meta.url).href;
 
 const PROCESS = [
   { n: '01', t: 'Artefakt vorbereiten',     d: 'Typ wählen, Idee strukturieren.',                  tone: 'human' },
@@ -54,13 +56,14 @@ function QuickCard({ go, target, color, icon, title, desc }) {
   );
 }
 
-export default function Dashboard({ go, role, openChat, openVideo }) {
+export default function Dashboard({ go, role, openChat }) {
+  const { library } = useLibraryData();
   const canReview = ['reviewer', 'maintainer', 'admin'].includes(role);
   const counts = {
-    library: LIBRARY.length,
-    prompt: LIBRARY.filter((x) => x.type === 'prompt').length,
-    dataset: LIBRARY.filter((x) => x.type === 'dataset').length,
-    industry: LIBRARY.filter((x) => x.type === 'industry').length,
+    library: library.length,
+    prompt: library.filter((x) => x.type === 'prompt').length,
+    dataset: library.filter((x) => x.type === 'dataset').length,
+    industry: library.filter((x) => x.type === 'industry').length,
     pipeline: REVIEW_PIPELINE.length,
   };
 
@@ -129,7 +132,7 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
               )}
               <span className="muted mono" style={{ fontSize: 11 }}>·</span>
               <a
-                href="https://github.com/pfernando-KI/kitomat"
+                href="https://github.com/ki-tomat/kitomat"
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-ghost btn-sm"
@@ -140,7 +143,14 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
             </div>
           </div>
 
-          <div className="video-card" onClick={openVideo}>
+          <div className="video-card video-card-live">
+            <video
+              className="video-player"
+              src={explainerVideoUrl}
+              controls
+              preload="metadata"
+              aria-label="KItomat Erklärvideo"
+            />
             <div className="video-corner">
               <img
                 src={markUrl}
@@ -155,36 +165,7 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
               KItomat · Tutorial
             </div>
             <div className="video-corner video-corner-r">
-              <Icon.spark size={10} /> Erklärvideo folgt
-            </div>
-            <div className="video-play">
-              <Icon.play />
-            </div>
-            <div className="video-overlay">
-              <div
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  opacity: 0.85,
-                  letterSpacing: '.06em',
-                  marginBottom: 6,
-                }}
-              >
-                02:00 · DEMO-VIDEO GEPLANT
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 700,
-                  letterSpacing: '-.015em',
-                  marginBottom: 4,
-                }}
-              >
-                So funktioniert KItomat
-              </div>
-              <div style={{ fontSize: 14, opacity: 0.88 }}>
-                In 2 Minuten: Artefakte finden, vorbereiten und reviewen.
-              </div>
+              <Icon.play size={10} /> Erklärvideo
             </div>
           </div>
         </section>
@@ -449,7 +430,7 @@ export default function Dashboard({ go, role, openChat, openVideo }) {
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-            {LIBRARY.slice(0, 3).map((a) => (
+            {library.slice(0, 3).map((a) => (
               <LibraryCard
                 key={a.id}
                 a={a}
